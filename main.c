@@ -1,4 +1,4 @@
-#include "driver.h"
+#include "vehical_state.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +9,6 @@
 int main(){
 
         //lauching safety module first
-
         bool running = true;
         bool mode_switch_condition = false; 
 
@@ -19,16 +18,16 @@ int main(){
         // call sensor reading module
 
 
-        //get_state();
+        //update_state();
 
 
         //determine the mode of operation based on the state of the car and the environment
         //set_initial_mode();
 
 
-        //initialize the shared state and the math utils for the controllers
-        VehicleState shared_state; 
-        MathUtils speed_pid;
+        //initialize the shared state and the PID controller math module
+        VehicleState shared_state;
+        PIDMathUtils speed_pid;
 
 
         pthread_t sim_thread;
@@ -87,7 +86,6 @@ int main(){
             exit(101);
         }
     
-
         // pthread_join(thread_id, return_value_pointer)
         pthread_join(sim_thread, NULL);
         pthread_join(ctrl_thread, NULL);

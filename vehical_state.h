@@ -19,8 +19,7 @@ typedef struct {
 
 
 // Control and Simulation Logic
-// We pass pointers (VehicleState*) instead of C++ references (VehicleState&)
-void LQR_speed_base_controller(VehicleState* state, MathUtils* pid);
+void LQR_speed_base_controller(VehicleState* state, PIDMathUtils* pid);
 void run_simulation(VehicleState* state);
 
 bool check_mode_switch_conditions(const char* current_mode);

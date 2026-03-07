@@ -1,4 +1,4 @@
-#include "driver.h"
+#include "vehical_state.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -9,7 +9,7 @@
 // Assuming sign() and MathUtils helpers are provided by your headers as mentioned
 extern double sign(double x); 
 
-void LQR_speed_base_controller(VehicleState* state, MathUtils* pid) {
+void LQR_speed_base_controller(VehicleState* state, PIDMathUtils* pid) {
 
         double K[3] = {    0.1098 ,   0.0966  ,  0.0010};
         double PID[3] = {1, 0.05 , 0.7};
