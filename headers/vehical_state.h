@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stdatomic.h>
-#include "math_modules/pid_math_module.h"
+#include "../math_modules/pid_math_module.h"
 
 typedef struct {
     _Atomic double v_error;
