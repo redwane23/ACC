@@ -19,15 +19,15 @@ int main(){
         // call sensor reading module
 
 
-        //update_state();
+        //get_state();
 
 
         //determine the mode of operation based on the state of the car and the environment
         //set_initial_mode();
 
 
-        //initialize the shared state and the PID controller
-        VehicleState shared_state;
+        //initialize the shared state and the math utils for the controllers
+        VehicleState shared_state; 
         MathUtils speed_pid;
 
 

@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdatomic.h>
+#include "math_modules/pid_math_module.h"
 
 typedef struct {
     _Atomic double v_error;
@@ -15,25 +16,7 @@ typedef struct {
     atomic_bool running;
 } VehicleState;
 
-/* MathUtils "Class" converted to a C Struct 
-*/
-typedef struct {
-    double integral;
-    double prev_value;
-    double limit;
-} MathUtils;
 
-
-
-// Math Utility Functions
-double math_update_integral(MathUtils* utils, double error, double dt);
-double math_update_derivative(MathUtils* utils, double current_val, double dt);
-void math_reset(MathUtils* utils);
-
-// Helper function (Static inline for performance)
-static inline double sign(double x) {
-    return (double)((x > 0) - (x < 0));
-}
 
 // Control and Simulation Logic
 // We pass pointers (VehicleState*) instead of C++ references (VehicleState&)
