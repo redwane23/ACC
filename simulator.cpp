@@ -1,4 +1,3 @@
-#include "driver.h"
 #include <chrono>
 #include <thread>
 #include <iostream>
@@ -7,10 +6,15 @@
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <nlohmann/json.hpp> 
+#include <stdatomic.h>
+
+extern "C" {
+#include "driver.h"
+}
 
 using json = nlohmann::json;
 
-void run_simulation(VehicleState& state) {
+int run_simulation(VehicleState& state) {
 
     namespace beast = boost::beast;         // from <boost/beast.hpp>
     namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
@@ -39,7 +43,8 @@ void run_simulation(VehicleState& state) {
         net::connect(ws.next_layer(), results.begin(), results.end());
         ws.handshake(host, target);
 
-        while (state.running) {
+        int running = atomic_load(&state.running);
+        while (running) {
 
             next_tick += target_interval;
             auto now = std::chrono::steady_clock::now();
@@ -47,33 +52,35 @@ void run_simulation(VehicleState& state) {
             last_sim_time = now;
 
             // 1. Get current force from the Controller
-            double F = state.force_cmd.load();
-
+            double F = atomic_load(&state.force_cmd);
             // a = F / m 
             double a = F / 1500.0; 
             
             // 3. Update state (Euler Integration)
-            state.cur_velocity.store( state.cur_velocity.load() + (a * dt) );
+            atomic_store(&state.cur_velocity,atomic_load(&state.cur_velocity) + (a * dt) );
 
-            double current_z = state.z.load();
-            double next_z = current_z + (state.v_error.load() * dt);
+            double current_z = atomic_load(&state.z);
+            double next_z = current_z + (atomic_load(&state.v_error) * dt);
 
             const double z_limit = 12.0; 
             if (next_z > z_limit) next_z = z_limit;
             if (next_z < -z_limit) next_z = -z_limit;
 
-            state.z.store(next_z);
+            atomic_store(&state.z,next_z);
 
-            state.pos_x.store( state.pos_x +(state.cur_velocity.load() * dt) );
-            state.acceleration.store(a);
+            atomic_store(&state.pos_x, atomic_load(&state.pos_x) + (atomic_load(&state.cur_velocity) * dt) );
+            atomic_store(&state.acceleration, a);
             
-            state.v_error.store( state.cur_velocity.load() - target_speed );
+            atomic_store(&state.v_error, atomic_load(&state.cur_velocity) - target_speed);
 
             if(now - last_send_time >= send_interval) {
                 json response;
                 response["data"] = {
-                    {"x_position", state.pos_x.load()},
-                    {"current_velocity", state.cur_velocity.load()},
+                    {"x_position", atomic_load(&state.pos_x)},
+                    {"current_velocity",atomic_load(&state.cur_velocity)},
+                    {"acceleration", atomic_load(&state.acceleration)},
+                    {"v_error", atomic_load(&state.v_error)},
+                    {"z", atomic_load(&state.z)}
                 };
                 response["sender"]="conroller";
 

@@ -74,7 +74,6 @@ void LQR_speed_base_controller(VehicleState* state, MathUtils* pid) {
 
             if (time_since_send >= 0.066) { // 66ms
                     //read from sensors (in our case we read from the shared state updated by the sim)
-                    
                     v_error = atomic_load(&state->v_error);
                     acceleration = atomic_load(&state->acceleration);
                     z = atomic_load(&state->z);
@@ -135,4 +134,5 @@ void LQR_speed_base_controller(VehicleState* state, MathUtils* pid) {
         else {
             printf("Warning: Controller loop is running behind schedule by %f seconds\n", -time_to_sleep);
         }
+}
 }
