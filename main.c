@@ -13,7 +13,7 @@ int main(){
         bool mode_switch_condition = false; 
 
         char modes [] = {"manual", "lqr", "mpc"};
-        char current_mode = modes[0]; // default to manual mode
+        char current_mode = modes[2]; // default to manual mode
 
         // call sensor reading module
 
@@ -27,12 +27,14 @@ int main(){
 
         //initialize the shared state and the PID controller math module
         VehicleState shared_state;
+        SystemState shared_system_state;
         PIDMathUtils speed_pid;
 
-
         pthread_t sim_thread;
+        pthread_t ctrl_thread;
         // pthread_create(thread_id, attributes, function_pointer, argument_pointer)
-        if (pthread_create(&sim_thread, NULL, (void* (*)(void*))run_simulation, &shared_state) != 0) {
+
+        if (pthread_create(&sim_thread, NULL, run_simulation, &shared_state) != 0) {
             fprintf(stderr, "Fatal Error: Controller failed to create thread: %d\n", 101);
             exit(101);
         }
@@ -44,15 +46,20 @@ int main(){
             break;
 
             case 'lqr': 
-                pthread_t ctrl_thread;
 
-                if (pthread_create(&ctrl_thread, NULL, (void* (*)(void*))LQR_speed_base_controller, &shared_state) != 0) {
+
+                if (pthread_create(ctrl_thread, NULL, (void* (*)(void*))LQR_speed_base_controller, &shared_state) != 0) {
                     fprintf(stderr, "Fatal Error: Controller failed to create thread:: %d\n", 101);
                     exit(101);
                 }
             break;
 
             case 'mpc': 
+
+            if (pthread_create(&ctrl_thread, NULL, (void* (*)(void*))MPC_gap_based_controller, &shared_system_state) != 0) {
+                fprintf(stderr, "Fatal Error: Controller failed to create thread:: %d\n", 101);
+                exit(101);
+            }
 
             break;
         
@@ -64,11 +71,11 @@ int main(){
 
         while(running) {
             //check for mode switch conditions this function will take the pointer and change the current mode in needed 
-            mode_switch_condition = check_mode_switch_conditions(&current_mode); 
+           // mode_switch_condition = check_mode_switch_conditions(&current_mode); 
 
-            if(mode_switch_condition){
-                // call the switching module
-            }
+            // if(mode_switch_condition){
+            //     // call the switching module
+            // }
 
 
 
@@ -79,7 +86,6 @@ int main(){
  
 
 
-        pthread_t ctrl_thread;
 
         if (pthread_create(&ctrl_thread, NULL, (void* (*)(void*))LQR_speed_base_controller, &shared_state) != 0) {
             fprintf(stderr, "Fatal Error: Controller failed to create thread:: %d\n", 101);

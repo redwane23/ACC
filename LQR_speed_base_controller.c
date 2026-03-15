@@ -1,4 +1,5 @@
 #include "headers/vehical_state.h"
+#include "math_modules/pid_math_module.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -110,8 +111,8 @@ void LQR_speed_base_controller(VehicleState* state, PIDMathUtils* pid) {
         
         float F_ffwd = F_inertia + F_aero + F_roll + F_grade + F_rotational;
 
-        double integral_v_error = update_integral(pid, v_error, dt);
-        double derivative_v_error = update_derivative(pid, acceleration, dt);
+        double integral_v_error = math_update_integral(pid, v_error, dt);
+        double derivative_v_error = math_update_derivative(pid, acceleration, dt);
 
         double u_pid = (PID[0] * v_error) + (PID[1] * integral_v_error) + (PID[2] * derivative_v_error);
 

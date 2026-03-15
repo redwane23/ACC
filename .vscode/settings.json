@@ -75,5 +75,6 @@
         "typeindex": "cpp",
         "__tree": "cpp",
         "map": "cpp"
-    }
+    },
+    "C_Cpp.default.compilerPath": "/usr/bin/gcc"
 }
