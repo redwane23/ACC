@@ -1,36 +1,48 @@
 CC = gcc
-CXX = g++                       # C++ compiler
-CFLAGS = -std=c11 -Wall -I. -I./mpc_test_grt_rtw
-CXXFLAGS = -std=c++11 -Wall -I. -I./mpc_test_grt_rtw   # Flags for C++
+CXX = g++
+# Added -I./adaptive_mpc_wrapper to CFLAGS and CXXFLAGS
+CFLAGS = -std=c11 -Wall -I. -I./adaptive_mpc_wrapper -I./headers
+CXXFLAGS = -std=c++11 -Wall -I. -I./adaptive_mpc_wrapper -I./headers
 TARGET = test
 BUILD_DIR = build
+LDFLAGS = -lm   # Link math library for MPC calculations
 
-# Find all source files
-C_SRCS = $(wildcard *.c) $(wildcard mpc_test_grt_rtw/*.c)
-CPP_SRCS = $(wildcard *.cpp) $(wildcard mpc_test_grt_rtw/*.cpp)
+# 1. Update source paths to adaptive_mpc_wrapper
+C_SRCS = $(wildcard *.c) \
+         $(wildcard adaptive_mpc_wrapper/*.c) \
+         $(wildcard headers/*.c)      
 
-# Object files go into build directory
+CPP_SRCS = $(wildcard *.cpp) \
+           $(wildcard adaptive_mpc_wrapper/*.cpp) \
+           $(wildcard headers/*.cpp)       
+
 C_OBJS = $(addprefix $(BUILD_DIR)/, $(notdir $(C_SRCS:.c=.o)))
 CPP_OBJS = $(addprefix $(BUILD_DIR)/, $(notdir $(CPP_SRCS:.cpp=.o)))
 OBJS = $(C_OBJS) $(CPP_OBJS)
 
 $(TARGET): $(OBJS) | $(BUILD_DIR)
-	$(CXX) $(OBJS) -o $(TARGET)          # Use C++ for linking
+	$(CXX) $(OBJS) -o $(TARGET) $(LDFLAGS)
 
-# Compile C files from current directory
+# --- Rules ---
+
 $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Compile C files from mpc_test_grt_rtw directory
-$(BUILD_DIR)/%.o: mpc_test_grt_rtw/%.c | $(BUILD_DIR)
+# 2. Updated rule for adaptive_mpc_wrapper C files
+$(BUILD_DIR)/%.o: adaptive_mpc_wrapper/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Compile C++ files from current directory
+$(BUILD_DIR)/%.o: headers/%.c | $(BUILD_DIR)    
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Compile C++ files from mpc_test_grt_rtw directory
-$(BUILD_DIR)/%.o: mpc_test_grt_rtw/%.cpp | $(BUILD_DIR)
+# 3. Updated rule for adaptive_mpc_wrapper CPP files
+$(BUILD_DIR)/%.o: adaptive_mpc_wrapper/%.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: headers/%.cpp | $(BUILD_DIR)  
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(BUILD_DIR):

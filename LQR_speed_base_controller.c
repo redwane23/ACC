@@ -10,7 +10,13 @@
 // Assuming sign() and MathUtils helpers are provided by your headers as mentioned
 extern double sign(double x); 
 
-void LQR_speed_base_controller(VehicleState* state, PIDMathUtils* pid) {
+void LQR_speed_base_controller(void* arg) {
+    controller_args_t* args = (controller_args_t*)arg;
+    SystemState* state = args->state;
+    PIDMathUtils* pid= args->pid;
+
+
+    //void LQR_speed_base_controller(SystemState* state, PIDMathUtils* pid);
 
         double K[3] = {    0.1098 ,   0.0966  ,  0.0010};
         double PID[3] = {1, 0.05 , 0.7};
@@ -33,7 +39,7 @@ void LQR_speed_base_controller(VehicleState* state, PIDMathUtils* pid) {
         double accel_cmd=0;
         double grade_angle=0;
 
-        double curent_velocity = atomic_load(&state->cur_velocity);
+        double curent_velocity = atomic_load(&state->v_ego);
         double v_error;
         double acceleration;
         double z;
@@ -76,7 +82,7 @@ void LQR_speed_base_controller(VehicleState* state, PIDMathUtils* pid) {
             if (time_since_send >= 0.066) { // 66ms
                     //read from sensors (in our case we read from the shared state updated by the sim)
                     v_error = atomic_load(&state->v_error);
-                    acceleration = atomic_load(&state->acceleration);
+                    acceleration = atomic_load(&state->ego_acceleration);
                     z = atomic_load(&state->z);
                 
                 printf("v_error : %f m/s, acceleration: %f m/s^2,, z: %f\n", v_error, acceleration, z);

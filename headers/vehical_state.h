@@ -8,27 +8,33 @@
 extern "C" {
 #endif
 
-typedef struct {
-    _Atomic double v_error;
-    _Atomic double acceleration;
-    _Atomic double z;
-    _Atomic double cur_velocity;
-    _Atomic double pos_x;
-    
-    _Atomic double force_cmd;
-    atomic_bool running;
-} VehicleState;
+typedef enum {
+    CONTROLLER_LQR,
+    CONTROLLER_MPC
+} ControllerMode;
+
 
 typedef struct {
-    _Atomic double v_ego;
-    _Atomic double x_ego;
+    //lqr related states
+    _Atomic double v_error;
+    _Atomic double z; //integral of velocity error
+
+    //mpc related states
     _Atomic double v_lead;
     _Atomic double x_lead;
+    _Atomic double lead_acceleration;
+
+    //shared in both
     _Atomic double pos_x;
-    
+    _Atomic double v_ego;
+    _Atomic double ego_acceleration;
+
     _Atomic double force_cmd;
+
+    ControllerMode mode; //mode switching variable
     atomic_bool running;
-} SystemState;
+
+} SystemState;// this strcture need some update to seperate the logic somehowe
 
 typedef struct {
     double integral;      // accumulated integral value
@@ -38,8 +44,14 @@ typedef struct {
     double min_integral;  // anti-windup limit (optional)
 } PIDMathUtils;
 
+typedef struct {
+    SystemState* state;
+    PIDMathUtils* pid;
+} controller_args_t;
+
+
 // Control and Simulation Logic
-void LQR_speed_base_controller(VehicleState* state, PIDMathUtils* pid);
+void LQR_speed_base_controller(void* arg);
 void MPC_gap_based_controller(SystemState* state);
 void* run_simulation(void* arg);
 bool check_mode_switch_conditions(const char* current_mode);

@@ -1,6 +1,7 @@
 #include <chrono>
 #include <thread>
 #include <iostream>
+#include <string>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/asio/connect.hpp>
@@ -8,12 +9,12 @@
 #include <nlohmann/json.hpp> 
 #include <stdatomic.h>
 #include "headers/vehical_state.h"
-
+#include <stdatomic.h>
 
 using json = nlohmann::json;
 
 extern "C" void* run_simulation(void* arg) {
-    VehicleState* state = (VehicleState*)arg;
+    SystemState* state = (SystemState*)arg;
 
     namespace beast = boost::beast;         // from <boost/beast.hpp>
     namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
@@ -29,7 +30,24 @@ extern "C" void* run_simulation(void* arg) {
     const std::chrono::milliseconds send_interval(16);
     auto now = std::chrono::steady_clock::now();
 
+    double sim_time = 0.0;
+    double dt;
+
+    double F;
+    double a;
+    const double z_limit = 12.0; 
+
+    double current_v_lead;
+    double current_z;
+    double next_z;
+    double z;
+
+    double v_lead_current;
+    double v_error;
+    json response;
+
     double target_speed = 3; // this values in in m/s 
+
     try {
         std::string host = "localhost"; 
         std::string port = "8000";     
@@ -49,51 +67,60 @@ extern "C" void* run_simulation(void* arg) {
 
             next_tick += target_interval;
             auto now = std::chrono::steady_clock::now();
-            double dt = std::chrono::duration<double>(now - last_sim_time).count();
+            dt = std::chrono::duration<double>(now - last_sim_time).count();
             last_sim_time = now;
+            sim_time += dt;
 
-            // 1. Get current force from the Controller
-            double F = atomic_load(&state->force_cmd);
-            // a = F / m 
-            double a = F / 1500.0; 
-            
-            // 3. Update state (Euler Integration)
-            atomic_store(&state->cur_velocity,atomic_load(&state->cur_velocity) + (a * dt) );
+            // Get control force
+            F = atomic_load(&state->force_cmd);
+            // Optional saturation
+            a = F / 1500.0;
 
-            double current_z = atomic_load(&state->z);
-            double next_z = current_z + (atomic_load(&state->v_error) * dt);
+            // Lead vehicle velocity (prescribed)
+            v_lead_current = 20.0 + 5.0 * std::sin(0.2 * sim_time);
 
-            const double z_limit = 12.0; 
-            if (next_z > z_limit) next_z = z_limit;
-            if (next_z < -z_limit) next_z = -z_limit;
 
-            atomic_store(&state->z,next_z);
+            // Update ego vehicle
+            atomic_store(&state->v_ego, atomic_load(&state->v_ego) + (a * dt));
+            atomic_store(&state->pos_x, atomic_load(&state->pos_x) + (atomic_load(&state->v_ego) * dt));
+            atomic_store(&state->ego_acceleration, a);
 
-            atomic_store(&state->pos_x, atomic_load(&state->pos_x) + (atomic_load(&state->cur_velocity) * dt) );
-            atomic_store(&state->acceleration, a);
-            
-            atomic_store(&state->v_error, atomic_load(&state->cur_velocity) - target_speed);
 
+            // Update lead position
+            atomic_store(&state->x_lead, atomic_load(&state->x_lead) + ( atomic_load(&state->v_lead) * dt));
+
+            // Integral term (e.g., for LQR)
+            v_error = atomic_load(&state->v_ego) - atomic_load(&state->v_lead); // track lead speed
+            atomic_store(&state->v_error, v_error);
+            z = atomic_load(&state->z) + v_error * dt;
+            atomic_store(&state->z, z);
+
+            // 4. Send updated state to the visule handler every 66ms
             if(now - last_send_time >= send_interval) {
-                json response;
+
                 response["data"] = {
                     {"x_position", atomic_load(&state->pos_x)},
-                    {"current_velocity",atomic_load(&state->cur_velocity)},
-                    {"acceleration", atomic_load(&state->acceleration)},
+                    {"current_velocity",atomic_load(&state->v_ego)},
+                    {"acceleration", atomic_load(&state->ego_acceleration)},
                     {"v_error", atomic_load(&state->v_error)},
-                    {"z", atomic_load(&state->z)}
+                    {"z", atomic_load(&state->z)},
+                    {"x_lead",atomic_load(&state->x_lead) },
+                    {"v_lead",atomic_load(&state->v_lead)},
                 };
+                // std::cout << " x_lead " << atomic_load(&state->x_lead) << std::endl;
                 response["sender"]="conroller";
 
                 ws.write(net::buffer(response.dump()));
                 last_send_time = now;
-            }
 
+            }
+            //setting a fixed tick rate of 100Hz will be higher at later 
             std::this_thread::sleep_until(next_tick);
 
         }
 
         }
+        //error handler
         catch (std::exception const& e) {
             std::cerr << "Error: " << e.what() << std::endl;
             state->running = false; // Stop the simulation on error
