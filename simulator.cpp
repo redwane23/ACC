@@ -1,7 +1,6 @@
 #include <chrono>
 #include <thread>
 #include <iostream>
-#include <string>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/asio/connect.hpp>
@@ -9,18 +8,11 @@
 #include <nlohmann/json.hpp> 
 #include <stdatomic.h>
 #include "headers/vehical_state.h"
-#include <stdatomic.h>
 
 using json = nlohmann::json;
 
 extern "C" void* run_simulation(void* arg) {
     SystemState* state = (SystemState*)arg;
-
-    namespace beast = boost::beast;         // from <boost/beast.hpp>
-    namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
-    namespace net = boost::asio;            // from <boost/asio.hpp>
-    using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
-
 
     auto last_sim_time = std::chrono::steady_clock::now();
     const std::chrono::microseconds  target_interval(10000); 
@@ -49,21 +41,26 @@ extern "C" void* run_simulation(void* arg) {
     double target_speed = 3; // this values in in m/s 
 
     try {
-        std::string host = "localhost"; 
-        std::string port = "8000";     
-        std::string target = "/ws/simumation/data_center/?client_type=controller"; // The specific WebSocket URL route
 
-        net::io_context ioc;
-        tcp::resolver resolver{ioc};
-        websocket::stream<tcp::socket> ws{ioc};
-        auto const results = resolver.resolve(host, port);
-        net::connect(ws.next_layer(), results.begin(), results.end());
-        ws.handshake(host, target);
-
+        namespace beast = boost::beast;         // from <boost/beast.hpp>
+        namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
+        namespace net = boost::asio;            // from <boost/asio.hpp>
+        using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
+    
         int running = atomic_load(&state->running);
 
 
         while (running) {
+            std::string host = "localhost"; 
+            std::string port = "8000";     
+            std::string target = "/ws/simumation/data_center/?client_type=controller"; // The specific WebSocket URL route
+    
+            net::io_context ioc;
+            tcp::resolver resolver{ioc};
+            websocket::stream<tcp::socket> ws{ioc};
+            auto const results = resolver.resolve(host, port);
+            net::connect(ws.next_layer(), results.begin(), results.end());
+            ws.handshake(host, target);
 
             next_tick += target_interval;
             auto now = std::chrono::steady_clock::now();
@@ -97,28 +94,26 @@ extern "C" void* run_simulation(void* arg) {
 
             // 4. Send updated state to the visule handler every 66ms
             if(now - last_send_time >= send_interval) {
-
                 response["data"] = {
                     {"x_position", atomic_load(&state->pos_x)},
-                    {"current_velocity",atomic_load(&state->v_ego)},
+                    {"current_velocity", atomic_load(&state->v_ego)},
                     {"acceleration", atomic_load(&state->ego_acceleration)},
                     {"v_error", atomic_load(&state->v_error)},
                     {"z", atomic_load(&state->z)},
-                    {"x_lead",atomic_load(&state->x_lead) },
-                    {"v_lead",atomic_load(&state->v_lead)},
+                    {"x_lead", atomic_load(&state->x_lead)},
+                    {"v_lead", atomic_load(&state->v_lead)},
                 };
-                // std::cout << " x_lead " << atomic_load(&state->x_lead) << std::endl;
                 response["sender"]="conroller";
 
                 ws.write(net::buffer(response.dump()));
-                last_send_time = now;
 
+                last_send_time = now;
             }
+            running = atomic_load(&state->running);
             //setting a fixed tick rate of 100Hz will be higher at later 
             std::this_thread::sleep_until(next_tick);
 
         }
-
         }
         //error handler
         catch (std::exception const& e) {

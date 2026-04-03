@@ -14,17 +14,11 @@ int main(){
         bool running = true;
         bool mode_switch_condition = false; 
 
-        //char modes [] = {"manual", "lqr", "mpc"}; i wanted to use string but swtich  are dump
+        //char modes [] = {"manual", "lqr", "mpc"}; i wanted to use string but swtich  are dump i need to create an enum 
         int modes [3] = {0,1,2};
-        int current_mode = modes[1]; 
+        int current_mode = modes[2]; 
 
         printf("Starting the controller in %d mode.\n", current_mode);
-        printf("hello");
-        // call sensor reading module
-
-
-        //update_state();
-
 
         //determine the mode of operation based on the state of the car and the environment
         //set_initial_mode();
@@ -99,10 +93,6 @@ int main(){
             //     // call the switching module
             // }
 
-
-
-
-            //data logger module (KAFKA)
         }
  
     

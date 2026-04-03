@@ -72,15 +72,6 @@ void MPC_gap_based_controller(SystemState* shared_system_state) {
 
                 md = v_lead;
 
-                // //debuging purpose
-                // printf("========= MPC DATA LOG =========\n");
-                // printf("Inputs:  gap_err = %.3f, v_ego = %.3f\n", y[0], y[1]);
-                // printf("Refs:    gap_ref = %.3f, v_ref = %.3f\n", r[0], r[1]);
-                // printf("Disturb: v_lead  = %.3f\n", md);
-                // printf("x_lead : %f \n",atomic_load(&shared_system_state->x_lead));
-                // printf("x_ego : %f \n",atomic_load(&shared_system_state->pos_x));
-                // printf("Desired: gap_des = %.3f, actual_gap = %.3f\n", desired_gap, measured_gap);
-
                 // 2. The MPC already "knows" its weights. Just call it:
                 adaptive_mpc_wrapper(&stateData, &onlineData, y, r, md, 
                     Ad, Bd, Cd, Dd, &u, &next_state);
