@@ -1,106 +1,90 @@
+#define _DEFAULT_SOURCE
 #include "headers/vehical_state.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdlib.h>
 #include <pthread.h>
 #include <stdbool.h>
-#include <stdatomic.h>
+#include <unistd.h>
 
-int main(){
-    
-
-        //lauching safety module first
-        bool running = true;
-        bool mode_switch_condition = false; 
-
-        //char modes [] = {"manual", "lqr", "mpc"}; i wanted to use string but swtich  are dump i need to create an enum 
-        int modes [3] = {0,1,2};
-        int current_mode = modes[2]; 
-
-        printf("Starting the controller in %d mode.\n", current_mode);
-
-        //determine the mode of operation based on the state of the car and the environment
-        //set_initial_mode();
+int main() {
+    bool running = true;
+    int modes[3] = {0, 1, 2};
+    int current_mode = modes[1];
+    printf("Starting the controller in %d mode.\n", current_mode);
 
 
-        //initialize the shared state and the PID controller math module
-        SystemState shared_system_state;;
-        PIDMathUtils speed_pid;
-        controller_args_t* args = malloc(sizeof(controller_args_t));
 
-        atomic_store(&shared_system_state.v_ego, 20.0);  // we used . instead of -> because it's not a pointer but a direct struct variable
-        atomic_store(&shared_system_state.pos_x, 0.0);
-        atomic_store(&shared_system_state.ego_acceleration, 0.0);
-        // atomic_store(&state.v_error, 0.0);
-        // atomic_store(&state.z, 0.0);
+    //Allocate SystemState
+    SystemState *shared_system_state = malloc(sizeof(SystemState));
+    pthread_mutex_init(&shared_system_state->lock, NULL);
 
-        atomic_store(&shared_system_state.v_lead, 20.0);
-        atomic_store(&shared_system_state.x_lead, 30.0);
-        atomic_store(&shared_system_state.lead_acceleration, 0.0);
+    // Allocate PIDMathUtils 
+    PIDMathUtils *speed_pid = malloc(sizeof(PIDMathUtils));
+    memset(speed_pid, 0, sizeof(PIDMathUtils)); // Clear math values
+
+    // Allocate controller args
+    controller_args_t* args = malloc(sizeof(controller_args_t));
+    args->state = shared_system_state; 
+    args->pid = speed_pid;            
+
+    // Allocate Thread Manager
+    Sim_threads *controle_threads = malloc(sizeof(Sim_threads));
+    controle_threads->ctrl_args = args;
+
+    if (current_mode == 1) {
+        printf("Initializing LQR controller.\n");
+        controle_threads->current_mode = 'L';
+        controle_threads->target_mode = 'L';
+    } else if (current_mode == 2) {
+        printf("Initializing MPC controller.\n");
+        controle_threads->current_mode = 'M';
+        controle_threads->target_mode = 'M';
+    }
+    //Initialize shared state using Mutex
+    pthread_mutex_lock(&shared_system_state->lock);
+    shared_system_state->running = true;
+    shared_system_state->pos_x =0;
+    shared_system_state->v_ego = 20.0;  
+    shared_system_state->ego_acceleration = 0.0;
+
+    shared_system_state->v_lead = 20.0;  
+    shared_system_state->lead_acceleration = 0.0;          
+    shared_system_state->x_lead =shared_system_state->pos_x + 31.0; 
+
+    shared_system_state->force_cmd = 0.0;
+    shared_system_state->target_speed = 20.0; //in m/s  
+    pthread_mutex_unlock(&shared_system_state->lock);
+
+    // 6. Start Threads
+    switch(current_mode) {
+        case 1:
+            printf("Starting the LQR controller thread.\n");
+            pthread_create(&controle_threads->LQR_thread, NULL, (void* (*)(void*))LQR_speed_base_controller, controle_threads->ctrl_args);
+            break;
+        case 2:
+            printf("Starting the MPC controller thread.\n");
+            pthread_create(&controle_threads->MPC_thread, NULL, (void* (*)(void*))MPC_gap_based_controller, shared_system_state);
+            break;
+
+    }
+
+    pthread_t sim_thread;
+    // Pass the pointer directly
+    if (pthread_create(&sim_thread, NULL, run_simulation, controle_threads) != 0) {
+        fprintf(stderr, "Fatal Error: Simulation thread failed\n");
+        exit(101);
+    }
+
+    // 7. Main Loop
+    while(running) {
+        pthread_mutex_lock(&shared_system_state->lock);
+        running = shared_system_state->running;
+        pthread_mutex_unlock(&shared_system_state->lock);
         
-        atomic_store(&shared_system_state.force_cmd, 0.0);
-        atomic_store(&shared_system_state.running, true);
+        // usleep(10000); 
+    }
 
-
-        pthread_t sim_thread;
-        pthread_t ctrl_thread;
-
-        // pthread_create(thread_id, attributes, function_pointer, argument_pointer)
-        if (pthread_create(&sim_thread, NULL, run_simulation, &shared_system_state) != 0) {
-            fprintf(stderr, "Fatal Error: Controller failed to create thread: %d\n", 101);
-            exit(101);
-        }
-
-
-        switch(current_mode) {
-            case 0: 
-                //running loop with no effect just ready
-            break;
-
-            case 1: 
-
-            args->state = &shared_system_state;
-            args->pid   = &speed_pid;
-
-                if (pthread_create(&ctrl_thread, NULL, (void* (*)(void*))LQR_speed_base_controller, args)  != 0) {
-                    fprintf(stderr, "Fatal Error: Controller failed to create thread:: %d\n", 101);
-                    exit(101);
-                }
-            break;
-
-            case 2: 
-                printf("Starting the MPC controller thread.\n");
-            if (pthread_create(&ctrl_thread, NULL, (void* (*)(void*))MPC_gap_based_controller, &shared_system_state) != 0) {
-                fprintf(stderr, "Fatal Error: Controller failed to create thread:: %d\n", 101);
-                exit(101);
-            }
-
-            break;
-        
-            default:
-
-                current_mode = modes[0];
-        }
-
-
-        while(running) {
-            //check for mode switch conditions this function will take the pointer and change the current mode in needed 
-           // mode_switch_condition = check_mode_switch_conditions(&current_mode); 
-
-
-            // if(mode_switch_condition){
-            //     // call the switching module
-            // }
-
-        }
- 
-    
-        // pthread_join(thread_id, return_value_pointer)
-        pthread_join(sim_thread, NULL);
-        pthread_join(ctrl_thread, NULL);
-
-
+    pthread_join(sim_thread, NULL);
     return EXIT_SUCCESS;
-
 }

@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 #include <stdatomic.h>
+#include <pthread.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,28 +15,42 @@ typedef enum {
     CONTROLLER_MPC
 } ControllerMode;
 
+#ifdef __cplusplus
+    #include <atomic>
+    // C++ version
+    typedef std::atomic<double> atomic_double_t;
+    typedef std::atomic<bool>   atomic_bool_t;
+#else
+    #include <stdatomic.h>
+    // C version
+    typedef _Atomic double atomic_double_t;
+    typedef _Atomic bool   atomic_bool_t;
+#endif
 
 typedef struct {
+    //Mutex to protect the data
+    pthread_mutex_t lock;
+
     //lqr related states
-    _Atomic double v_error;
-    _Atomic double z; //integral of velocity error
+    double v_error;
+    double z; 
+    double target_speed;
 
     //mpc related states
-    _Atomic double v_lead;
-    _Atomic double x_lead;
-    _Atomic double lead_acceleration;
+    double v_lead;
+    double x_lead;
+    double lead_acceleration;
 
     //shared in both
-    _Atomic double pos_x;
-    _Atomic double v_ego;
-    _Atomic double ego_acceleration;
+    double pos_x;
+    double v_ego;
+    double ego_acceleration;
 
-    _Atomic double force_cmd;
-
-    ControllerMode mode; //mode switching variable
-    atomic_bool running;
-
-} SystemState;// this strcture need some update to seperate the logic somehowe
+    double force_cmd;
+    
+    ControllerMode mode;
+    bool running; 
+} SystemState;
 
 typedef struct {
     double integral;      // accumulated integral value
@@ -44,10 +60,23 @@ typedef struct {
     double min_integral;  // anti-windup limit (optional)
 } PIDMathUtils;
 
+
 typedef struct {
     SystemState* state;
     PIDMathUtils* pid;
 } controller_args_t;
+
+
+typedef struct {
+    pthread_t MPC_thread;
+    pthread_t LQR_thread;
+
+    char current_mode ;
+    char target_mode ;
+
+    controller_args_t* ctrl_args;
+
+} Sim_threads;
 
 
 // Control and Simulation Logic
