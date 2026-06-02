@@ -17,7 +17,8 @@ void LQR_speed_base_controller(void* arg) {
     SystemState* state = args->state;
     PIDMathUtils* pid = args->pid;
 
-    double K[3] = { 0.1298 , 0.0966 , 0.0010};
+    // double K[3] = { 0.1298 , 0.0966 , 0.0010};
+    double K[2] = {10.235326 , 4.534963};
     int m = 1500; 
     float g = 9.81; 
     float rho = 1.225; 
@@ -35,7 +36,7 @@ void LQR_speed_base_controller(void* arg) {
     double max_jerk = 5.0; 
     double accel_cmd = 0;
     double grade_angle = 0;
-    
+    double d;
     
     // Initial read
     pthread_mutex_lock(&state->lock);
@@ -80,16 +81,16 @@ void LQR_speed_base_controller(void* arg) {
 
             v_error = state->v_error;
             acceleration = state->ego_acceleration;
-            z = state->z;
+            // z = state->z;
             curent_velocity = state->v_ego; 
             bool should_run = state->running;
-
+            d=state->digital_velocity - curent_velocity;
             pthread_mutex_unlock(&state->lock);
 
             if (!should_run) break;
 
-             printf("v_error : %f m/s, acceleration: %f m/s^2 , z : %f \n ", v_error, acceleration, z);
-            u_lqr = -( (K[0] * v_error) + (K[1] * acceleration) + (K[2] * z) );
+             printf("v_error : %f m/s, acceleration: %f m/s^2  \n ", v_error, acceleration);
+            u_lqr = -( (K[0] * v_error) + (K[1] * acceleration) )+d;
             desired_accel = u_lqr;
             last_send_time = now;
         }
@@ -111,7 +112,12 @@ void LQR_speed_base_controller(void* arg) {
         float F_rotational = m_rotational_equiv * accel_cmd;
         float F_ffwd = F_inertia + F_aero + F_roll + F_grade + F_rotational;
 
-        finla_output = accel_cmd * m ; //don't apply external forces(F_ffwd) becouse the sim doesn't have them yet
+
+
+   
+        finla_output = accel_cmd * m ; 
+        
+        //don't apply external forces(F_ffwd) becouse the sim doesn't have them yet
 
 
         pthread_mutex_lock(&state->lock);

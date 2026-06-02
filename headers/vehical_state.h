@@ -33,9 +33,10 @@ typedef struct {
 
     //lqr related states
     double v_error;
-    double z; 
+    double digital_velocity; 
     double target_speed;
-
+    double previous_velocity;
+    
     //mpc related states
     double v_lead;
     double x_lead;

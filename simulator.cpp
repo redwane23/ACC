@@ -29,8 +29,13 @@ extern "C" void* run_simulation(void* arg) {
     auto last_send_time = std::chrono::steady_clock::now();
     const std::chrono::milliseconds send_interval(16);
 
+    auto last_target_change = std::chrono::steady_clock::now();   
+    const std::chrono::seconds target_change_interval(10); 
+
     double sim_time = 0.0;
     double dt;
+    double F ;
+    double acceleration_cmd; // Assuming a mass of 1500 kg for the  vehicle
     int cr;//cansel result for check
     // Initial check of running state
     pthread_mutex_lock(&state->lock);
@@ -113,8 +118,7 @@ extern "C" void* run_simulation(void* arg) {
             } while (err != RdKafka::ERR_NO_ERROR);
             delete metadata;
 
-
-
+   
         while (running) {
             auto now = std::chrono::steady_clock::now();
             dt = std::chrono::duration<double>(now - last_sim_time).count();
@@ -124,17 +128,26 @@ extern "C" void* run_simulation(void* arg) {
             //physics update
             pthread_mutex_lock(&state->lock);
 
-            double F = state->force_cmd;
-            double a = F / 1500.0; // Assuming a mass of 1500 kg for the  vehicle
+            F = state->force_cmd;
+            acceleration_cmd = F / 1500.0; // Assuming a mass of 1500 kg for the  vehicle
 
 
-            state->v_ego += (a * dt);
-            state->ego_acceleration = a;
+            state->v_ego += (acceleration_cmd * dt);
+            state->ego_acceleration = acceleration_cmd;
             state->pos_x += (state->v_ego * dt);
 
             if (threads_info->current_mode == 'L') {
                 state->v_error = state->v_ego - state->target_speed;
-                std::cout << "starget speed : " << state->target_speed << "  " <<std::endl;
+                state->digital_velocity = state->previous_velocity + acceleration_cmd * dt;
+                state->previous_velocity = state->v_ego;
+                if (now - last_target_change >= target_change_interval) {
+
+                    double new_target = 15.0 + (rand() % 11); // 15..25 m/s
+                    state->target_speed = new_target;
+                    last_target_change = now;
+                    std::cout << "[L mode] Target speed changed to " << new_target << " m/s" << std::endl;
+                }
+                
             }
 
             else if (threads_info->current_mode == 'M') {
@@ -144,13 +157,10 @@ extern "C" void* run_simulation(void* arg) {
                 std::cout <<" im excuting : " << std::endl;
             }
 
-            state->z += state->v_error * dt; //investigate v_error variable 
-
             double log_x = state->pos_x;
             double log_v = state->v_ego;
             double log_a = state->ego_acceleration;
             double log_ve = state->v_error;
-            double log_z = state->z;
             double log_xl = state->x_lead;
             double log_vl = state->v_lead;
 
@@ -165,9 +175,10 @@ extern "C" void* run_simulation(void* arg) {
                     {"current_velocity", log_v},
                     {"acceleration", log_a},
                     {"v_error", log_ve},
-                    {"z", log_z},
                     {"x_lead", log_xl},
                     {"v_lead", log_vl},
+                    {"target_speed", state->target_speed},
+                    {"mode", std::string(1, threads_info->current_mode)}
                 };
                 
                 response["sender"] = "controller";
@@ -201,7 +212,6 @@ extern "C" void* run_simulation(void* arg) {
                     state->v_lead = 20.0;
                     state->x_lead = 50.0;
                     state->v_error = 0.0;
-                    state->z = 0.0;
 
                 } else if (cmd == "MPC") {
 
@@ -214,20 +224,7 @@ extern "C" void* run_simulation(void* arg) {
                     }
                     pthread_create(&threads_info->MPC_thread, NULL, (void* (*)(void*))MPC_gap_based_controller, threads_info->ctrl_args->state);
 
-                    // threads_info->ctrl_args->state->pos_x =0;
-                    // threads_info->ctrl_args->state->v_ego = 20.0;  
-                    // threads_info->ctrl_args->state->ego_acceleration = 0.0;
-
-                    // threads_info->ctrl_args->state->v_lead = 20.0;  
-                    // threads_info->ctrl_args->state->lead_acceleration = 0.0;          
                     threads_info->ctrl_args->state->x_lead = threads_info->ctrl_args->state->pos_x + 35.0; 
-
-                    // threads_info->ctrl_args->state->force_cmd = 0.0;
-                    // threads_info->ctrl_args->state->target_speed = 20.0;
-
-
-
-                    
                     threads_info->current_mode = 'M';
                     threads_info->target_mode = 'M';
                     
@@ -245,17 +242,8 @@ extern "C" void* run_simulation(void* arg) {
                     
 
                     pthread_create(&threads_info->LQR_thread, NULL, (void* (*)(void*))LQR_speed_base_controller, threads_info->ctrl_args);
-
-                    // threads_info->ctrl_args->state->pos_x =0;
-                    // threads_info->ctrl_args->state->v_ego = 20.0;  
-                    // threads_info->ctrl_args->state->ego_acceleration = 0.0;
-
-                    // threads_info->ctrl_args->state->v_lead = 0.0;  
-                    // threads_info->ctrl_args->state->lead_acceleration = 0.0;          
+          
                     threads_info->ctrl_args->state->x_lead = threads_info->ctrl_args->state->pos_x - 300.0;  //hide it
-
-                    // threads_info->ctrl_args->state->force_cmd = 0.0;
-                    // threads_info->ctrl_args->state->target_speed = 20.0;
                     threads_info->current_mode = 'L';
                     threads_info->target_mode = 'L';
                 }

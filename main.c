@@ -47,10 +47,11 @@ int main() {
     shared_system_state->pos_x =0;
     shared_system_state->v_ego = 20.0;  
     shared_system_state->ego_acceleration = 0.0;
-
+    shared_system_state->previous_velocity =     shared_system_state->v_ego;
     shared_system_state->v_lead = 20.0;  
     shared_system_state->lead_acceleration = 0.0;          
     shared_system_state->x_lead =shared_system_state->pos_x + 31.0; 
+    shared_system_state->digital_velocity= 20.0;
 
     shared_system_state->force_cmd = 0.0;
     shared_system_state->target_speed = 20.0; //in m/s  
