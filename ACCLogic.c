@@ -58,11 +58,42 @@ void revieve_supervisor_challenge() {
   health_challange.crc = crc_r_calc ((const uint8_t*)&health_challange, 4U);
 }
 
+void init_degraded_pid () {}
+
 void fsm () {
   
+switch (acc_state) {
+  
+  case STATE_STANDBY:
+    break;
+
+  case STATE_FREE_CRUISE:
+    break;
+
+  case STATE_FOLLOW_MODE:
+     break;
+
+  case STATE_OVERRIDE:
+    break;
+
+  case STATE_DEGRADED:
+    init_degraded_pid();
+    break;
+
+  case STATE_FAILURE:
+    break;
+    
+  default:
+    current_state = STATE_FAILURE;
+    break;
+}
 }
 
-void step_ref () {}
+void step_ref () {
+  if (acc_state == STATE_FREE_CRUISE || acc_state == STATE_FOLLOW_MODE || acc_state == STATE_DEGRADED) {
+    
+  }
+}
 
 void format_math_msg () {}
 
